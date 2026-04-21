@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>专注度监控数据可视化</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-brain"></i>
+                <h1>专注度智能监控系统</h1>
+            </div>
+            <div class="header-info">
+                <span class="last-update">最后更新: <span id="last-update-time">--:--:--</span></span>
+                <span class="device-status"><i class="fas fa-circle" style="color: #4CAF50;"></i> 设备在线</span>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- 左侧分类栏 -->
+            <nav class="sidebar">
+                <div class="sidebar-header">
+                    <h3><i class="fas fa-stream"></i> 数据分类</h3>
+                </div>
+                <ul class="category-list">
+                    <li class="category-item active" data-category="all">
+                        <i class="fas fa-chart-line"></i>
+                        <span>全部数据</span>
+                    </li>
+                    <li class="category-item" data-category="focus_report">
+                        <i class="fas fa-user-check"></i>
+                        <span>专注度报告</span>
+                    </li>
+                    <li class="category-item" data-category="environment">
+                        <i class="fas fa-temperature-low"></i>
+                        <span>环境数据</span>
+                    </li>
+                    <li class="category-item" data-category="device_info">
+                        <i class="fas fa-microchip"></i>
+                        <span>设备信息</span>
+                    </li>
+                </ul>
+                
+                <div class="data-summary">
+                    <h4><i class="fas fa-chart-pie"></i> 数据统计</h4>
+                    <div class="summary-item">
+                        <span class="summary-label">今日上报次数</span>
+                        <span class="summary-value" id="today-count">128</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">平均专注度</span>
+                        <span class="summary-value" id="avg-focus">78%</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">设备数量</span>
+                        <span class="summary-value" id="device-count">3</span>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- 右侧主内容区 -->
+            <div class="content-area">
+                <div class="content-header">
+                    <h2><i class="fas fa-cube"></i> 物模型数据</h2>
+                    <div class="data-actions">
+                        <button class="btn-refresh" id="refresh-btn">
+                            <i class="fas fa-sync-alt"></i> 刷新数据
+                        </button>
+                        <button class="btn-export" id="export-btn">
+                            <i class="fas fa-download"></i> 导出数据
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 搜索区域 -->
+                <div class="search-section">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="service-search" placeholder="搜索服务名称...">
+                    </div>
+                    <div class="search-box">
+                        <i class="fas fa-filter"></i>
+                        <input type="text" id="property-search" placeholder="搜索属性名称...">
+                    </div>
+                    <div class="search-box">
+                        <i class="fas fa-calendar-alt"></i>
+                        <input type="date" id="date-filter" value="2026-03-23">
+                    </div>
+                </div>
+
+                <!-- 数据展示区域 -->
+                <div class="data-display">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3><i class="fas fa-chart-area"></i> 专注度变化趋势</h3>
+                            <div class="chart-controls">
+                                <select id="time-range">
+                                    <option value="1h">最近1小时</option>
+                                    <option value="6h">最近6小时</option>
+                                    <option value="24h" selected>最近24小时</option>
+                                    <option value="7d">最近7天</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="focus-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 数据表格 -->
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3><i class="fas fa-table"></i> 最新上报数据</h3>
+                            <div class="table-info">
+                                <span class="record-count">共 <span id="record-count">12</span> 条记录</span>
+                            </div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>设备ID</th>
+                                        <th>专注度(%)</th>
+                                        <th>温度(℃)</th>
+                                        <th>湿度(%)</th>
+                                        <th>光照(lux)</th>
+                                        <th>噪声(dB)</th>
+                                        <th>最新上报时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="data-table-body">
+                                    <!-- 数据行将由JavaScript动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 物模型属性展示 -->
+                    <div class="property-container">
+                        <div class="property-header">
+                            <h3><i class="fas fa-list-alt"></i> 物模型属性详情</h3>
+                            <div class="property-notice">
+                                <i class="fas fa-exclamation-circle"></i>
+                                <span>注意：当上报属性名称和产品模型不一致或属性名称中包含特殊字符$、空字符(十六进制的ASCII码为00)时，会无法正常刷新属性数据。</span>
+                            </div>
+                        </div>
+                        <div class="property-list" id="property-list">
+                            <!-- 属性列表将由JavaScript动态生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <div class="footer-left">
+                <span>© 2026 专注度监控系统 | 数据来源：华为云IoT平台</span>
+            </div>
+            <div class="footer-right">
+                <span>系统状态: <span class="status-online">运行正常</span></span>
+                <span>API响应: <span class="status-api">65ms</span></span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 数据详情模态框 -->
+    <div class="modal" id="data-detail-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-info-circle"></i> 数据详情</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-section">
+                    <h4>设备信息</h4>
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">设备ID:</span>
+                            <span class="detail-value" id="detail-device-id">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">设备名称:</span>
+                            <span class="detail-value" id="detail-device-name">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">在线状态:</span>
+                            <span class="detail-value" id="detail-device-status">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">最后活跃:</span>
+                            <span class="detail-value" id="detail-last-active">--</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h4>专注度数据</h4>
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">当前专注度:</span>
+                            <span class="detail-value" id="detail-focus-current">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">今日平均:</span>
+                            <span class="detail-value" id="detail-focus-avg">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">今日峰值:</span>
+                            <span class="detail-value" id="detail-focus-max">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">今日谷值:</span>
+                            <span class="detail-value" id="detail-focus-min">--</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h4>环境数据</h4>
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">温度:</span>
+                            <span class="detail-value" id="detail-temp">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">湿度:</span>
+                            <span class="detail-value" id="detail-humidity">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">光照:</span>
+                            <span class="detail-value" id="detail-light">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">噪声:</span>
+                            <span class="detail-value" id="detail-noise">--</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h4>原始数据</h4>
+                    <pre class="raw-data" id="detail-raw-data">--</pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="modal-close-btn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
