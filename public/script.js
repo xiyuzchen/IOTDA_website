@@ -1,16 +1,12 @@
 // 配置
 // 配置
 const CONFIG = {
-  // 后端API地址 - 根据您的部署情况修改
-  // 本地开发：http://localhost:5000/api
-  // 生产环境：https://您的域名/api
-  API_BASE_URL: 'http://localhost:5000/api',
-  
+  // Cloudflare Worker 地址
+  API_BASE_URL: 'https://focus.13542858693.workers.dev/',
   // 模拟数据开关
   // true: 使用模拟数据（当后端不可用时）
   // false: 使用真实API数据（当后端正常运行时）
   USE_MOCK_DATA: false,
-  
   // 自动刷新间隔（毫秒）
   REFRESH_INTERVAL: 30000,
   
@@ -178,93 +174,25 @@ function loadMockData() {
 }
 
 // 从API获取真实数据
+// 从API获取真实数据
 async function fetchRealData() {
   try {
-    // 显示加载状态
     showLoading();
     
-    // 1. 获取设备数据
-    const devicesResponse = await fetch(`${CONFIG.API_BASE_URL}/devices`);
-    if (!devicesResponse.ok) {
-      throw new Error(`设备数据请求失败: ${devicesResponse.status}`);
+    // 只调用一个接口获取所有数据
+    const response = await fetch(`${CONFIG.API_BASE_URL}/data`);
+    if (!response.ok) {
+      throw new Error(`数据请求失败: ${response.status}`);
     }
     
-    const devicesData = await devicesResponse.json();
+    const data = await response.json();
     
     // 更新应用状态
-    appState.devices = devicesData.devices || [];
-    appState.stats = devicesData.stats || { total: 0, online: 0, offline: 0 };
-    appState.lastUpdate = devicesData.lastUpdate;
-    
-    // 2. 获取第一个设备的专注度历史数据（如果有专注度数据）
-    const focusDevice = appState.devices.find(d => d.focus_percentage !== null);
-    if (focusDevice) {
-      try {
-        const historyResponse = await fetch(
-          `${CONFIG.API_BASE_URL}/device/${focusDevice.device_id}/history?property=focus_percentage&hours=24`
-        );
-        
-        if (historyResponse.ok) {
-          const historyData = await historyResponse.json();
-          appState.focusHistory = historyData.history || [];
-        }
-      } catch (historyError) {
-        console.warn('获取历史数据失败:', historyError);
-      }
-    }
-    
-    // 3. 获取产品模型属性
-    try {
-      const propertiesResponse = await fetch(`${CONFIG.API_BASE_URL}/product/model`);
-      if (propertiesResponse.ok) {
-        const propertiesData = await propertiesResponse.json();
-        appState.properties = propertiesData.properties || [];
-        
-        // 用真实设备数据更新属性值
-        if (appState.devices.length > 0) {
-          const device = appState.devices[0];
-          appState.properties = appState.properties.map(prop => {
-            let value = '--';
-            let lastUpdate = prop.last_update;
-            
-            // 根据属性名映射设备数据
-            switch(prop.name) {
-              case 'device_id':
-                value = device.device_id;
-                break;
-              case 'focus_percentage':
-                value = device.focus_percentage ? `${device.focus_percentage}%` : '--';
-                lastUpdate = device.timestamp;
-                break;
-              case 'temperature':
-                value = device.temperature ? `${device.temperature}℃` : '--';
-                lastUpdate = device.timestamp;
-                break;
-              case 'humidity':
-                value = device.humidity ? `${device.humidity}%` : '--';
-                lastUpdate = device.timestamp;
-                break;
-              case 'light':
-                value = device.light ? `${device.light} lux` : '--';
-                lastUpdate = device.timestamp;
-                break;
-              case 'noise':
-                value = device.noise ? `${device.noise} dB` : '--';
-                lastUpdate = device.timestamp;
-                break;
-              case 'status':
-                value = device.status;
-                lastUpdate = device.last_active;
-                break;
-            }
-            
-            return { ...prop, value, last_update: lastUpdate };
-          });
-        }
-      }
-    } catch (propertiesError) {
-      console.warn('获取产品模型失败:', propertiesError);
-    }
+    appState.devices = data.devices || [];
+    appState.focusHistory = data.focusHistory || [];
+    appState.properties = data.properties || [];
+    appState.stats = data.stats || { total: 0, online: 0, offline: 0 };
+    appState.lastUpdate = data.lastUpdate;
     
     // 计算平均专注度
     const focusDevices = appState.devices.filter(d => d.focus_percentage !== null);
@@ -273,19 +201,15 @@ async function fetchRealData() {
       appState.stats.avgFocus = Math.round(totalFocus / focusDevices.length);
     }
     
-    // 更新UI
     updateUI();
-    
-    // 隐藏加载状态
     hideLoading();
-    
-    // 显示成功提示
-    const dataSource = CONFIG.USE_MOCK_DATA ? '模拟数据' : '华为云IoT';
-    showToast(`数据加载成功 (${dataSource})`, 'success');
+    showToast('数据加载成功 (来自华为云IoT)', 'success');
     
   } catch (error) {
     console.error('获取真实数据失败:', error);
-    throw error;
+    hideLoading();
+    showToast('获取真实数据失败，切换到模拟数据', 'error');
+    loadMockData(); // 失败时回退到模拟数据
   }
 }
 
